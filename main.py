@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
-from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import silhouette_score
 
 
@@ -22,50 +21,130 @@ st.set_page_config(
 
 
 # ---------------------------------------------------------
-# CUSTOM STYLE
+# THEME
 # ---------------------------------------------------------
 
+st.sidebar.title("SmartCart")
+st.sidebar.caption("Customer segmentation dashboard")
+
+theme = st.sidebar.radio(
+    "Appearance",
+    ["Light", "Dark"],
+    horizontal=True,
+    index=1,
+    help="Switch between light and dark appearance."
+)
+
+if theme == "Dark":
+    COLORS = {
+        "background": "#111827",
+        "surface": "#1F2937",
+        "text": "#F3F4F6",
+        "muted": "#9CA3AF",
+        "grid": "#374151",
+        "accent": "#3B82F6"
+    }
+else:
+    COLORS = {
+        "background": "#F8FAFC",
+        "surface": "#FFFFFF",
+        "text": "#1F2937",
+        "muted": "#64748B",
+        "grid": "#E2E8F0",
+        "accent": "#2563EB"
+    }
+
+# Stable, distinct colours for cluster labels across all cluster charts.
+CLUSTER_COLORS = [
+    "#2563EB", "#EA580C", "#16A34A", "#DC2626", "#7C3AED",
+    "#0891B2", "#DB2777", "#65A30D", "#C2410C", "#475569"
+]
+
+
+def style_axis(ax):
+    ax.set_facecolor(COLORS["surface"])
+    ax.tick_params(colors=COLORS["text"])
+    ax.xaxis.label.set_color(COLORS["text"])
+    ax.yaxis.label.set_color(COLORS["text"])
+    ax.title.set_color(COLORS["text"])
+    for spine in ax.spines.values():
+        spine.set_color(COLORS["grid"])
+    ax.grid(axis="y", color=COLORS["grid"], alpha=0.55, linewidth=0.8)
+
+
 st.markdown(
-    """
+    f"""
     <style>
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        div[data-testid="stMetric"] {
-            background: #172554;
-            border: 1px solid #263b70;
-            padding: 15px;
-            border-radius: 12px;
-        }
-        div[data-testid="stMetric"] label {
-            color: #cbd5e1;
-        }
-        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-            color: #ffffff;
-        }
-        .section-note {
-            color: #94a3b8;
-            font-size: 0.92rem;
-        }
+        :root {{ color-scheme: {"dark" if theme == "Dark" else "light"}; }}
+        .stApp, [data-testid="stAppViewContainer"] {{
+            background-color: {COLORS["background"]};
+            color: {COLORS["text"]};
+        }}
+        [data-testid="stSidebar"] {{
+            background-color: {COLORS["surface"]};
+            border-right: 1px solid {COLORS["grid"]};
+        }}
+        [data-testid="stSidebar"] * {{ color: {COLORS["text"]}; }}
+        .block-container {{
+            max-width: 1420px;
+            padding-top: 1.8rem;
+            padding-bottom: 3rem;
+        }}
+        h1, h2, h3 {{
+            color: {COLORS["text"]};
+            letter-spacing: -0.02em;
+            font-weight: 650;
+        }}
+        p, label, [data-testid="stCaptionContainer"] {{
+            color: {COLORS["muted"]};
+        }}
+        div[data-testid="stMetric"] {{
+            background-color: {COLORS["surface"]};
+            border: 1px solid {COLORS["grid"]};
+            border-radius: 8px;
+            padding: 16px 18px;
+            box-shadow: none;
+        }}
+        div[data-testid="stMetric"] label {{ color: {COLORS["muted"]}; }}
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {{
+            color: {COLORS["text"]};
+            font-weight: 650;
+        }}
+        div[data-testid="stDataFrame"], div[data-testid="stTable"] {{
+            border: 1px solid {COLORS["grid"]};
+            border-radius: 8px;
+            overflow: hidden;
+        }}
+        div.stButton > button, div.stDownloadButton > button {{
+            border-radius: 7px;
+            border: 1px solid {COLORS["grid"]};
+            box-shadow: none;
+            font-weight: 600;
+        }}
+        div.stButton > button[kind="primary"] {{
+            background-color: {COLORS["accent"]};
+            border-color: {COLORS["accent"]};
+            color: #FFFFFF;
+        }}
+        [data-testid="stToolbar"], #MainMenu, footer {{
+            visibility: hidden;
+            height: 0;
+        }}
+        header[data-testid="stHeader"] {{ background-color: transparent; }}
     </style>
     """,
     unsafe_allow_html=True
 )
 
-
 # ---------------------------------------------------------
 # HEADER
 # ---------------------------------------------------------
 
-st.title("🛒 SmartCart Customer Clustering System")
-st.write(
-    "Explore customer segments using different clustering algorithms. "
-    "Compare customer behaviour, visualize clusters, and estimate the "
-    "segment of a new customer."
+st.title("SmartCart Customer Segmentation")
+st.caption(
+    "Explore customer groups, evaluate clustering quality, and compare purchasing behaviour."
 )
 st.divider()
-
 
 # ---------------------------------------------------------
 # LOAD DATA
@@ -110,53 +189,28 @@ if missing_columns:
 # SIDEBAR - ALGORITHM SETTINGS
 # ---------------------------------------------------------
 
-st.sidebar.title("SmartCart")
-st.sidebar.caption("Customer segmentation dashboard")
 st.sidebar.info(
     f"Dataset contains {len(df):,} customer records and {len(df.columns)} columns."
 )
 
-st.sidebar.subheader("Clustering Algorithm")
+st.sidebar.subheader("Model Settings")
 
 algorithm = st.sidebar.selectbox(
     "Choose an algorithm",
     [
         "K-Means",
-        "Agglomerative Clustering",
-        "DBSCAN",
-        "Gaussian Mixture"
+        "Agglomerative Clustering"
     ]
 )
 
-if algorithm in ["K-Means", "Agglomerative Clustering", "Gaussian Mixture"]:
-    number_of_clusters = st.sidebar.slider(
-        "Number of clusters",
-        min_value=2,
-        max_value=10,
-        value=4
-    )
-else:
-    number_of_clusters = 4
+number_of_clusters = st.sidebar.slider(
+    "Number of clusters",
+    min_value=2,
+    max_value=10,
+    value=4
+)
 
-if algorithm == "DBSCAN":
-    dbscan_eps = st.sidebar.slider(
-        "DBSCAN eps",
-        min_value=0.1,
-        max_value=5.0,
-        value=1.2,
-        step=0.1,
-        help="Maximum distance between two samples for them to be considered neighbours."
-    )
-    dbscan_min_samples = st.sidebar.slider(
-        "DBSCAN minimum samples",
-        min_value=3,
-        max_value=30,
-        value=8
-    )
-else:
-    dbscan_eps = 1.2
-    dbscan_min_samples = 8
-
+st.sidebar.caption("Choose the clustering method and number of segments.")
 st.sidebar.divider()
 st.sidebar.caption(
     "The same preprocessing and PCA-transformed features are used "
@@ -169,7 +223,7 @@ st.sidebar.caption(
 # ---------------------------------------------------------
 
 @st.cache_data(show_spinner="Preparing customer data and running clustering...")
-def prepare_and_cluster(data, selected_algorithm, n_clusters, eps, min_samples):
+def prepare_and_cluster(data, selected_algorithm, n_clusters):
 
     working_df = data.copy()
 
@@ -306,20 +360,6 @@ def prepare_and_cluster(data, selected_algorithm, n_clusters, eps, min_samples):
         )
         cluster_labels = model.fit_predict(pca_features)
 
-    elif selected_algorithm == "DBSCAN":
-        model = DBSCAN(
-            eps=eps,
-            min_samples=min_samples
-        )
-        cluster_labels = model.fit_predict(pca_features)
-
-    else:
-        model = GaussianMixture(
-            n_components=n_clusters,
-            random_state=42,
-            n_init=5
-        )
-        cluster_labels = model.fit_predict(pca_features)
 
     result_df = cleaned_df.copy()
     result_df["Cluster"] = cluster_labels
@@ -353,9 +393,7 @@ try:
     ) = prepare_and_cluster(
         df,
         algorithm,
-        number_of_clusters,
-        dbscan_eps,
-        dbscan_min_samples
+        number_of_clusters
     )
 except Exception as error:
     st.error(f"Model training failed: {error}")
@@ -363,49 +401,152 @@ except Exception as error:
 
 
 # ---------------------------------------------------------
+# MODEL EVALUATION - ELBOW AND SILHOUETTE
+# ---------------------------------------------------------
+
+@st.cache_data(show_spinner="Evaluating K-Means cluster counts...")
+def evaluate_kmeans(features, max_k=10):
+    rows = []
+    upper_k = min(max_k, len(features) - 1)
+
+    for k in range(2, upper_k + 1):
+        model = KMeans(
+            n_clusters=k,
+            random_state=42,
+            n_init=10
+        )
+        labels = model.fit_predict(features)
+
+        # Silhouette is evaluated on a reproducible sample for responsiveness.
+        sil = silhouette_score(
+            features,
+            labels,
+            sample_size=min(1000, len(features)),
+            random_state=42
+        )
+
+        rows.append({
+            "K": k,
+            "Inertia": float(model.inertia_),
+            "Silhouette Score": float(sil)
+        })
+
+    return pd.DataFrame(rows)
+
+
+try:
+    evaluation_df = evaluate_kmeans(X_pca, max_k=10)
+except Exception as error:
+    evaluation_df = pd.DataFrame()
+    st.warning(f"Could not calculate the K-Means evaluation curves: {error}")
+
+
+# ---------------------------------------------------------
 # METRICS
 # ---------------------------------------------------------
 
 unique_labels = sorted(np.unique(cluster_labels).tolist())
-valid_cluster_labels = [label for label in unique_labels if label != -1]
-noise_count = int(np.sum(cluster_labels == -1))
 
-if len(valid_cluster_labels) >= 2:
-    if algorithm == "DBSCAN":
-        valid_mask = cluster_labels != -1
-        if len(set(cluster_labels[valid_mask])) >= 2:
-            score = silhouette_score(X_pca[valid_mask], cluster_labels[valid_mask])
-        else:
-            score = None
-    else:
-        score = silhouette_score(X_pca, cluster_labels)
+if len(unique_labels) >= 2 and len(unique_labels) < len(cluster_labels):
+    score = silhouette_score(
+        X_pca,
+        cluster_labels,
+        sample_size=min(1000, len(X_pca)),
+        random_state=42
+    )
 else:
     score = None
 
-st.subheader("📊 Customer Segmentation Overview")
+st.subheader("At a glance")
 
 metric1, metric2, metric3, metric4 = st.columns(4)
 
 with metric1:
-    st.metric("Original Customers", f"{len(df):,}")
+    st.metric("Source customers", f"{len(df):,}")
 
 with metric2:
-    st.metric("Customers Analysed", f"{len(df_result):,}")
+    st.metric("Customers analysed", f"{len(df_result):,}")
 
 with metric3:
-    st.metric("Clusters Found", len(valid_cluster_labels))
+    st.metric("Clusters identified", len(unique_labels))
 
 with metric4:
     st.metric(
-        "Silhouette Score",
-        f"{score:.3f}" if score is not None else "N/A"
+        "Silhouette score",
+        f"{score:.3f}" if score is not None else "Not available",
+        help="A higher silhouette score generally indicates better-separated clusters."
     )
 
-if algorithm == "DBSCAN":
+st.divider()
+
+st.header("Model Evaluation")
+st.caption(
+    "Use the Elbow Method and Silhouette Score to assess suitable K values. "
+    "These evaluation curves are calculated with K-Means on the same PCA features."
+)
+
+if not evaluation_df.empty:
+    best_row = evaluation_df.loc[evaluation_df["Silhouette Score"].idxmax()]
+    eval_col1, eval_col2 = st.columns(2)
+
+    with eval_col1:
+        st.markdown("#### Elbow Method")
+        st.caption("Lower inertia means tighter clusters. Look for the point where the decrease starts slowing down.")
+        fig_elbow, ax_elbow = plt.subplots(figsize=(7, 4))
+        fig_elbow.patch.set_facecolor(COLORS["surface"])
+        ax_elbow.plot(
+            evaluation_df["K"],
+            evaluation_df["Inertia"],
+            marker="o",
+            linewidth=2.5,
+            color=COLORS["accent"]
+        )
+        ax_elbow.set_xlabel("Number of clusters (K)")
+        ax_elbow.set_ylabel("Within-cluster sum of squares (Inertia)")
+        ax_elbow.set_title("Elbow Curve")
+        ax_elbow.set_xticks(evaluation_df["K"])
+        style_axis(ax_elbow)
+        st.pyplot(fig_elbow, use_container_width=True)
+        plt.close(fig_elbow)
+
+    with eval_col2:
+        st.markdown("#### Silhouette Analysis")
+        st.caption("Higher values indicate better-defined and better-separated clusters.")
+        fig_sil, ax_sil = plt.subplots(figsize=(7, 4))
+        fig_sil.patch.set_facecolor(COLORS["surface"])
+        ax_sil.plot(
+            evaluation_df["K"],
+            evaluation_df["Silhouette Score"],
+            marker="o",
+            linewidth=2.5,
+            color="#10B981"
+        )
+        ax_sil.axvline(
+            best_row["K"],
+            linestyle="--",
+            linewidth=1.5,
+            color="#F59E0B",
+            label=f"Best tested K = {int(best_row['K'])}"
+        )
+        ax_sil.set_xlabel("Number of clusters (K)")
+        ax_sil.set_ylabel("Silhouette Score")
+        ax_sil.set_title("Silhouette Score by K")
+        ax_sil.set_xticks(evaluation_df["K"])
+        style_axis(ax_sil)
+        ax_sil.legend()
+        st.pyplot(fig_sil, use_container_width=True)
+        plt.close(fig_sil)
+
+    best_col1, best_col2, best_col3 = st.columns(3)
+    best_col1.metric("Best tested K", int(best_row["K"]))
+    best_col2.metric("Best silhouette", f"{best_row['Silhouette Score']:.3f}")
+    best_col3.metric("Current model silhouette", f"{score:.3f}" if score is not None else "N/A")
     st.caption(
-        f"DBSCAN identified {noise_count:,} noise/outlier records. "
-        "Noise points are labelled as Cluster -1."
+        "The best tested K is the K-Means result with the highest silhouette score "
+        "among the evaluated values; use the Elbow Curve as a complementary visual check."
     )
+else:
+    st.info("Not enough data points to calculate K-Means evaluation curves.")
 
 st.divider()
 
@@ -414,7 +555,7 @@ st.divider()
 # CLUSTER PROFILE
 # ---------------------------------------------------------
 
-st.subheader("👥 Cluster Profile")
+st.header("Customer Segment Profiles")
 
 profile_columns = [
     "Income",
@@ -435,12 +576,19 @@ profile = (
 st.dataframe(profile, use_container_width=True)
 
 
+# Assign a stable, distinct color to each cluster label across every chart.
+cluster_color_map = {
+    label: CLUSTER_COLORS[index % len(CLUSTER_COLORS)]
+    for index, label in enumerate(unique_labels)
+}
+
+
 # ---------------------------------------------------------
 # GRAPH 1 - CLUSTER DISTRIBUTION
 # ---------------------------------------------------------
 
 st.divider()
-st.subheader("📈 Cluster Distribution")
+st.subheader("Cluster Distribution")
 st.caption("Number of customers assigned to each cluster.")
 
 cluster_counts = (
@@ -450,15 +598,19 @@ cluster_counts = (
 )
 
 fig1, ax1 = plt.subplots(figsize=(8, 4))
+fig1.patch.set_facecolor(COLORS["surface"])
 bars = ax1.bar(
     cluster_counts.index.astype(str),
-    cluster_counts.values
+    cluster_counts.values,
+    color=[cluster_color_map[label] for label in cluster_counts.index],
+    width=0.62
 )
 
 ax1.set_title("Number of Customers in Each Cluster")
 ax1.set_xlabel("Cluster")
 ax1.set_ylabel("Number of Customers")
-ax1.grid(axis="y", alpha=0.25)
+style_axis(ax1)
+ax1.grid(axis="y", alpha=0.35)
 
 for bar in bars:
     ax1.text(
@@ -477,31 +629,34 @@ plt.close(fig1)
 # GRAPH 2 - PCA CLUSTER VISUALIZATION
 # ---------------------------------------------------------
 
-st.subheader("🔬 PCA Cluster Visualization")
+st.subheader("PCA Cluster Visualization")
 st.caption(
     "Each point represents a customer. PCA reduces the prepared features "
     "to two dimensions for visualization."
 )
 
 fig2, ax2 = plt.subplots(figsize=(9, 5))
+fig2.patch.set_facecolor(COLORS["surface"])
 
 for label in unique_labels:
     mask = cluster_labels == label
-    label_name = "Noise / Outliers" if label == -1 else f"Cluster {label}"
+    label_name = f"Cluster {label}"
 
     ax2.scatter(
         X_pca[mask, 0],
         X_pca[mask, 1],
         label=label_name,
-        alpha=0.65,
-        s=24
+        alpha=0.78,
+        s=28,
+        color=cluster_color_map[label],
+        edgecolors="none"
     )
 
 ax2.set_title(f"{algorithm} - Customer Segments")
 ax2.set_xlabel("Principal Component 1")
 ax2.set_ylabel("Principal Component 2")
-ax2.legend()
-ax2.grid(alpha=0.2)
+style_axis(ax2)
+ax2.legend(frameon=True)
 
 st.pyplot(fig2, use_container_width=True)
 plt.close(fig2)
@@ -511,28 +666,31 @@ plt.close(fig2)
 # GRAPH 3 - INCOME VS SPENDING
 # ---------------------------------------------------------
 
-st.subheader("💰 Income vs Total Spending")
+st.subheader("Income vs Total Spending")
 st.caption("Compare customer income and spending behaviour across clusters.")
 
 fig3, ax3 = plt.subplots(figsize=(9, 5))
+fig3.patch.set_facecolor(COLORS["surface"])
 
 for label in unique_labels:
     cluster_data = df_result[df_result["Cluster"] == label]
-    label_name = "Noise / Outliers" if label == -1 else f"Cluster {label}"
+    label_name = f"Cluster {label}"
 
     ax3.scatter(
         cluster_data["Income"],
         cluster_data["Total_Spending"],
         label=label_name,
-        alpha=0.65,
-        s=28
+        alpha=0.78,
+        s=30,
+        color=cluster_color_map[label],
+        edgecolors="none"
     )
 
 ax3.set_title("Customer Income vs Total Spending")
 ax3.set_xlabel("Income")
 ax3.set_ylabel("Total Spending")
-ax3.legend()
-ax3.grid(alpha=0.2)
+style_axis(ax3)
+ax3.legend(frameon=True)
 
 st.pyplot(fig3, use_container_width=True)
 plt.close(fig3)
@@ -542,7 +700,7 @@ plt.close(fig3)
 # GRAPH 4 - SPENDING DISTRIBUTION
 # ---------------------------------------------------------
 
-st.subheader("🛍️ Spending Distribution by Cluster")
+st.subheader("Spending Distribution by Cluster")
 
 spending_groups = [
     df_result.loc[df_result["Cluster"] == label, "Total_Spending"].dropna().values
@@ -550,21 +708,25 @@ spending_groups = [
 ]
 
 spending_names = [
-    "Noise" if label == -1 else f"Cluster {label}"
+    f"Cluster {label}"
     for label in unique_labels
 ]
 
 fig4, ax4 = plt.subplots(figsize=(9, 5))
-ax4.boxplot(
+fig4.patch.set_facecolor(COLORS["surface"])
+boxplot = ax4.boxplot(
     spending_groups,
     tick_labels=spending_names,
     patch_artist=True,
     showfliers=False
 )
+for patch, label in zip(boxplot["boxes"], unique_labels):
+    patch.set_facecolor(cluster_color_map[label])
+    patch.set_alpha(0.8)
 ax4.set_title("Total Spending Across Clusters")
 ax4.set_xlabel("Cluster")
 ax4.set_ylabel("Total Spending")
-ax4.grid(axis="y", alpha=0.25)
+style_axis(ax4)
 
 st.pyplot(fig4, use_container_width=True)
 plt.close(fig4)
@@ -574,17 +736,21 @@ plt.close(fig4)
 # GRAPH 5 - CUSTOMER DISTRIBUTION PIE CHART
 # ---------------------------------------------------------
 
-st.subheader("🥧 Customer Segment Share")
+st.subheader("Customer Segment Share")
 
 fig5, ax5 = plt.subplots(figsize=(7, 5))
+fig5.patch.set_facecolor(COLORS["surface"])
 ax5.pie(
     cluster_counts.values,
     labels=[
-        "Noise" if label == -1 else f"Cluster {label}"
+        f"Cluster {label}"
         for label in cluster_counts.index
     ],
     autopct="%1.1f%%",
-    startangle=90
+    startangle=90,
+    colors=[cluster_color_map[label] for label in cluster_counts.index],
+    wedgeprops={"edgecolor": COLORS["surface"], "linewidth": 2},
+    textprops={"color": COLORS["text"]}
 )
 ax5.set_title("Percentage of Customers in Each Cluster")
 ax5.axis("equal")
@@ -597,7 +763,7 @@ plt.close(fig5)
 # GRAPH 6 - CLUSTER PROFILE COMPARISON
 # ---------------------------------------------------------
 
-st.subheader("📊 Cluster Behaviour Comparison")
+st.subheader("Cluster Behaviour Comparison")
 st.caption(
     "Values are normalized column-wise to make features with different "
     "units easier to compare."
@@ -619,17 +785,25 @@ column_range = (heatmap_data.max() - column_min).replace(0, 1)
 normalized_profile = (heatmap_data - column_min) / column_range
 
 fig6, ax6 = plt.subplots(figsize=(11, 5))
-image = ax6.imshow(normalized_profile.values, aspect="auto")
+fig6.patch.set_facecolor(COLORS["surface"])
+image = ax6.imshow(
+    normalized_profile.values,
+    aspect="auto",
+    cmap="viridis"
+)
 
 ax6.set_xticks(range(len(heatmap_columns)))
 ax6.set_xticklabels(heatmap_columns, rotation=30, ha="right")
 ax6.set_yticks(range(len(normalized_profile.index)))
 ax6.set_yticklabels([
-    "Noise" if label == -1 else f"Cluster {label}"
+    f"Cluster {label}"
     for label in normalized_profile.index
 ])
 
 ax6.set_title("Normalized Cluster Profile Heatmap")
+ax6.tick_params(colors=COLORS["text"])
+for spine in ax6.spines.values():
+    spine.set_color(COLORS["grid"])
 fig6.colorbar(image, ax=ax6, label="Relative value (0 to 1)")
 
 st.pyplot(fig6, use_container_width=True)
@@ -641,7 +815,7 @@ plt.close(fig6)
 # ---------------------------------------------------------
 
 st.divider()
-st.subheader("🔍 Find Customer Segment")
+st.header("Explore a New Customer")
 st.write(
     "Enter customer information to estimate which segment the customer "
     "belongs to using the selected clustering algorithm."
@@ -791,39 +965,16 @@ if st.button("🎯 Predict Customer Cluster", use_container_width=True):
     if algorithm == "K-Means":
         predicted_cluster = int(clustering_model.predict(customer_pca)[0])
         prediction_method = "K-Means model prediction"
-
-    elif algorithm == "Gaussian Mixture":
-        predicted_cluster = int(clustering_model.predict(customer_pca)[0])
-        prediction_method = "Gaussian Mixture model prediction"
-
     else:
-        # Agglomerative Clustering and DBSCAN do not provide predict().
-        # Estimate the segment using the nearest existing cluster centroid.
-        centroid_labels = [
-            label for label in unique_labels if label != -1
-        ]
-
-        if not centroid_labels:
-            st.error(
-                "The selected algorithm did not identify any usable clusters. "
-                "Adjust the clustering settings and try again."
-            )
-            st.stop()
-
+        # Agglomerative Clustering has no predict() method.
+        # Assign the new customer to the nearest existing cluster centroid.
         centroids = np.array([
             X_pca[cluster_labels == label].mean(axis=0)
-            for label in centroid_labels
+            for label in unique_labels
         ])
 
-        distances = np.linalg.norm(
-            centroids - customer_pca[0],
-            axis=1
-        )
-
-        predicted_cluster = int(
-            centroid_labels[int(np.argmin(distances))]
-        )
-
+        distances = np.linalg.norm(centroids - customer_pca[0], axis=1)
+        predicted_cluster = int(unique_labels[int(np.argmin(distances))])
         prediction_method = "Nearest existing cluster centroid estimate"
 
     st.success(
@@ -834,7 +985,7 @@ if st.button("🎯 Predict Customer Cluster", use_container_width=True):
     if predicted_cluster in profile.index:
         selected_profile = profile.loc[predicted_cluster]
 
-        st.subheader(f"📌 Cluster {predicted_cluster} Profile")
+        st.subheader(f"Cluster {predicted_cluster} Profile")
 
         p1, p2, p3, p4 = st.columns(4)
 
@@ -868,7 +1019,7 @@ if st.button("🎯 Predict Customer Cluster", use_container_width=True):
 # ---------------------------------------------------------
 
 st.divider()
-st.subheader("📁 Clustered Customer Dataset")
+st.header("Customer Data")
 
 csv_data = df_result.to_csv(index=False).encode("utf-8")
 
@@ -892,6 +1043,5 @@ with st.expander("View Clustered Customer Data"):
 
 st.divider()
 st.caption(
-    "SmartCart Customer Clustering System | "
-    "Customer Segmentation using Unsupervised Machine Learning"
+    "SmartCart · Customer Intelligence · Unsupervised Machine Learning"
 )
