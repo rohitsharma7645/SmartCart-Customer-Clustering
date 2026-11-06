@@ -160,6 +160,11 @@ st.markdown(
             visibility: hidden;
             height: 0;
         }}
+        [data-testid="stToolbarActions"],
+        [data-testid="stToolbar"] button[title*="Share"],
+        [data-testid="stToolbar"] button[title*="Deploy"] {{
+            display: none !important;
+        }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
         [data-testid*="collapsedControl"],
         [data-testid*="SidebarCollapsedControl"] {{
