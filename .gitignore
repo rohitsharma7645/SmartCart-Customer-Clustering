@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+
+# Jupyter files
+.ipynb_checkpoints/
+smart_clustering.ipynb
+
+
+# Virtual environments
+venv/
+.venv/
+
+# Anaconda files
+.virtual_documents/
+anaconda_projects/
