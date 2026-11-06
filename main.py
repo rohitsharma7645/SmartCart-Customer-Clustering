@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import base64
+from pathlib import Path
 
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.decomposition import PCA
@@ -31,7 +33,7 @@ theme = st.sidebar.radio(
     "Appearance",
     ["Light", "Dark"],
     horizontal=True,
-    index=1,
+    index=0,
     help="Switch between light and dark appearance."
 )
 
@@ -42,7 +44,7 @@ if theme == "Dark":
         "text": "#F3F4F6",
         "muted": "#9CA3AF",
         "grid": "#374151",
-        "accent": "#3B82F6"
+        "accent": "#0891B2"
     }
 else:
     COLORS = {
@@ -51,7 +53,7 @@ else:
         "text": "#1F2937",
         "muted": "#64748B",
         "grid": "#E2E8F0",
-        "accent": "#2563EB"
+        "accent": "#0891B2"
     }
 
 # Stable, distinct colours for cluster labels across all cluster charts.
@@ -64,9 +66,9 @@ CLUSTER_COLORS = [
 def style_axis(ax):
     ax.set_facecolor(COLORS["surface"])
     ax.tick_params(colors=COLORS["text"])
+    ax.title.set_color(COLORS["text"])
     ax.xaxis.label.set_color(COLORS["text"])
     ax.yaxis.label.set_color(COLORS["text"])
-    ax.title.set_color(COLORS["text"])
     for spine in ax.spines.values():
         spine.set_color(COLORS["grid"])
     ax.grid(axis="y", color=COLORS["grid"], alpha=0.55, linewidth=0.8)
@@ -85,8 +87,21 @@ st.markdown(
             border-right: 1px solid {COLORS["grid"]};
         }}
         [data-testid="stSidebar"] * {{ color: {COLORS["text"]}; }}
+        .stApp, .stApp p, .stApp label, .stApp [data-testid="stMarkdownContainer"],
+        .stApp [data-testid="stWidgetLabel"] {{ color: {COLORS["text"]}; }}
+        .stApp input, .stApp textarea, .stApp [data-baseweb="select"] > div,
+        .stApp [data-baseweb="input"] > div {{
+            background-color: {COLORS["surface"]};
+            color: {COLORS["text"]};
+            border-color: {COLORS["grid"]};
+        }}
+        .stApp input::placeholder, .stApp textarea::placeholder {{ color: {COLORS["muted"]}; }}
+        .stApp [data-baseweb="select"] *, .stApp [role="listbox"] *,
+        .stApp [role="option"] {{ color: {COLORS["text"]}; }}
+        .stApp [role="listbox"], .stApp [role="option"] {{ background-color: {COLORS["surface"]}; }}
+        .stApp [data-testid="stCheckbox"] label, .stApp [role="radiogroup"] label {{ color: {COLORS["text"]}; }}
         .block-container {{
-            max-width: 1420px;
+        max-width: 1200px;
             padding-top: 1.8rem;
             padding-bottom: 3rem;
         }}
@@ -111,26 +126,87 @@ st.markdown(
             font-weight: 650;
         }}
         div[data-testid="stDataFrame"], div[data-testid="stTable"] {{
+            background-color: {COLORS["surface"]};
             border: 1px solid {COLORS["grid"]};
             border-radius: 8px;
             overflow: hidden;
         }}
+        div[data-testid="stDataFrame"] {{
+            --gdg-bg-cell: {COLORS["surface"]};
+            --gdg-bg-cell-medium: {COLORS["surface"]};
+            --gdg-text-dark: {COLORS["text"]};
+            --gdg-text-medium: {COLORS["muted"]};
+            --gdg-border-color: {COLORS["grid"]};
+        }}
         div.stButton > button, div.stDownloadButton > button {{
+            background-color: {COLORS["surface"]};
+            color: {COLORS["text"]};
             border-radius: 7px;
             border: 1px solid {COLORS["grid"]};
             box-shadow: none;
             font-weight: 600;
+        }}
+        div.stButton > button:hover, div.stDownloadButton > button:hover {{
+            background-color: {COLORS["accent"]};
+            border-color: {COLORS["accent"]};
+            color: #FFFFFF;
         }}
         div.stButton > button[kind="primary"] {{
             background-color: {COLORS["accent"]};
             border-color: {COLORS["accent"]};
             color: #FFFFFF;
         }}
-        [data-testid="stToolbar"], #MainMenu, footer {{
+        #MainMenu, footer {{
             visibility: hidden;
             height: 0;
         }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
+        [data-testid*="collapsedControl"],
+        [data-testid*="SidebarCollapsedControl"] {{
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            color: {COLORS["text"]} !important;
+        }}
+        [data-testid*="collapsedControl"] button,
+        [data-testid*="SidebarCollapsedControl"] button {{
+            color: {COLORS["text"]} !important;
+            background-color: {COLORS["surface"]} !important;
+            border: 1px solid {COLORS["grid"]} !important;
+            border-radius: 6px !important;
+            opacity: 1 !important;
+        }}
+        [data-testid*="collapsedControl"] svg,
+        [data-testid*="SidebarCollapsedControl"] svg {{
+            color: {COLORS["text"]} !important;
+            fill: {COLORS["text"]} !important;
+            stroke: {COLORS["text"]} !important;
+            opacity: 1 !important;
+        }}
+        header[data-testid="stHeader"] button,
+        header[data-testid="stHeader"] [role="button"] {{
+            color: {COLORS["text"]} !important;
+            background-color: {COLORS["surface"]} !important;
+            border-color: {COLORS["grid"]} !important;
+        }}
+        header[data-testid="stHeader"] button svg,
+        header[data-testid="stHeader"] button svg path,
+        header[data-testid="stHeader"] [role="button"] svg,
+        header[data-testid="stHeader"] [role="button"] svg path {{
+            color: {COLORS["text"]} !important;
+            fill: {COLORS["text"]} !important;
+            stroke: {COLORS["text"]} !important;
+        }}
+        {'''header[data-testid="stHeader"] button,
+        header[data-testid="stHeader"] button svg,
+        header[data-testid="stHeader"] button svg path,
+        header[data-testid="stHeader"] [role="button"],
+        header[data-testid="stHeader"] [role="button"] svg,
+        header[data-testid="stHeader"] [role="button"] svg path {
+            color: #000000 !important;
+            fill: #000000 !important;
+            stroke: #000000 !important;
+        }''' if theme == "Light" else ""}
     </style>
     """,
     unsafe_allow_html=True
@@ -140,6 +216,32 @@ st.markdown(
 # HEADER
 # ---------------------------------------------------------
 
+st.markdown(
+    '''<nav class="top-nav">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#model-evaluation">Model evaluation</a>
+        <a href="#customer-data">Customer data</a>
+        <span class="nav-spacer"></span>
+        <a href="https://github.com/rohitsharma7645" target="_blank" rel="noopener" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.76-.24.76-.54v-2.1c-3.1.68-3.76-1.32-3.76-1.32-.51-1.3-1.24-1.65-1.24-1.65-1.01-.69.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15 1 1.7 2.61 1.21 3.25.93.1-.72.39-1.21.71-1.49-2.48-.28-5.09-1.24-5.09-5.53 0-1.22.44-2.21 1.15-2.99-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.08 1.14a10.7 10.7 0 0 1 5.6 0c2.14-1.44 3.08-1.14 3.08-1.14.61 1.53.23 2.67.11 2.95.72.78 1.15 1.77 1.15 2.99 0 4.3-2.61 5.25-5.1 5.53.4.35.76 1.03.76 2.08v3.08c0 .3.2.65.77.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
+        </a>
+        <a href="https://www.linkedin.com/in/rohit-sharma-5a9878325/" target="_blank" rel="noopener" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 2H3.55C2.69 2 2 2.68 2 3.52v16.96c0 .84.69 1.52 1.55 1.52h16.9c.86 0 1.55-.68 1.55-1.52V3.52c0-.84-.69-1.52-1.55-1.52ZM7.93 18.9H4.98V9.4h2.95v9.5ZM6.45 8.1a1.71 1.71 0 1 1 0-3.42 1.71 1.71 0 0 1 0 3.42Zm12.47 10.8h-2.95v-4.62c0-1.1-.02-2.52-1.54-2.52-1.54 0-1.78 1.2-1.78 2.44v4.7H9.7V9.4h2.83v1.3h.04c.39-.74 1.36-1.52 2.8-1.52 3 0 3.55 1.97 3.55 4.53v5.19Z"/></svg>
+        </a>
+        <img class="nav-avatar" src="data:image/jpeg;base64,''' + base64.b64encode(Path(__file__).with_name("my_pic.jpeg").read_bytes()).decode("ascii") + '''" alt="Rohit Sharma">
+    </nav>
+    <style>
+        .top-nav { display:flex; align-items:center; gap:1.25rem; padding:.7rem 0 1.2rem; border-bottom:1px solid ''' + COLORS["grid"] + '''; margin-bottom:1.5rem; }
+        .top-nav a { color: ''' + COLORS["text"] + ''' !important; text-decoration:none; font-weight:600; }
+        .top-nav a:hover { color: ''' + COLORS["accent"] + ''' !important; }
+        .top-nav .nav-spacer { flex:1; }
+        .top-nav svg { width:21px; height:21px; fill:currentColor; display:block; }
+        .top-nav .nav-avatar { width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid ''' + COLORS["grid"] + '''; }
+    </style>''',
+    unsafe_allow_html=True
+)
+
+st.markdown('<div id="dashboard"></div>', unsafe_allow_html=True)
 st.title("SmartCart Customer Segmentation")
 st.caption(
     "Explore customer groups, evaluate clustering quality, and compare purchasing behaviour."
@@ -480,6 +582,7 @@ with metric4:
 st.divider()
 
 st.header("Model Evaluation")
+st.markdown('<div id="model-evaluation"></div>', unsafe_allow_html=True)
 st.caption(
     "Use the Elbow Method and Silhouette Score to assess suitable K values. "
     "These evaluation curves are calculated with K-Means on the same PCA features."
@@ -487,55 +590,45 @@ st.caption(
 
 if not evaluation_df.empty:
     best_row = evaluation_df.loc[evaluation_df["Silhouette Score"].idxmax()]
-    eval_col1, eval_col2 = st.columns(2)
-
-    with eval_col1:
-        st.markdown("#### Elbow Method")
-        st.caption("Lower inertia means tighter clusters. Look for the point where the decrease starts slowing down.")
-        fig_elbow, ax_elbow = plt.subplots(figsize=(7, 4))
-        fig_elbow.patch.set_facecolor(COLORS["surface"])
-        ax_elbow.plot(
-            evaluation_df["K"],
-            evaluation_df["Inertia"],
-            marker="o",
-            linewidth=2.5,
-            color=COLORS["accent"]
-        )
-        ax_elbow.set_xlabel("Number of clusters (K)")
-        ax_elbow.set_ylabel("Within-cluster sum of squares (Inertia)")
-        ax_elbow.set_title("Elbow Curve")
-        ax_elbow.set_xticks(evaluation_df["K"])
-        style_axis(ax_elbow)
-        st.pyplot(fig_elbow, use_container_width=True)
-        plt.close(fig_elbow)
-
-    with eval_col2:
-        st.markdown("#### Silhouette Analysis")
-        st.caption("Higher values indicate better-defined and better-separated clusters.")
-        fig_sil, ax_sil = plt.subplots(figsize=(7, 4))
-        fig_sil.patch.set_facecolor(COLORS["surface"])
-        ax_sil.plot(
-            evaluation_df["K"],
-            evaluation_df["Silhouette Score"],
-            marker="o",
-            linewidth=2.5,
-            color="#10B981"
-        )
-        ax_sil.axvline(
-            best_row["K"],
-            linestyle="--",
-            linewidth=1.5,
-            color="#F59E0B",
-            label=f"Best tested K = {int(best_row['K'])}"
-        )
-        ax_sil.set_xlabel("Number of clusters (K)")
-        ax_sil.set_ylabel("Silhouette Score")
-        ax_sil.set_title("Silhouette Score by K")
-        ax_sil.set_xticks(evaluation_df["K"])
-        style_axis(ax_sil)
-        ax_sil.legend()
-        st.pyplot(fig_sil, use_container_width=True)
-        plt.close(fig_sil)
+    st.caption("Compare WCSS and silhouette score across cluster counts on one chart.")
+    fig_eval, ax_wcss = plt.subplots(figsize=(6.5, 3.4))
+    fig_eval.patch.set_facecolor(COLORS["surface"])
+    ax_wcss.set_facecolor(COLORS["surface"])
+    ax_wcss.plot(evaluation_df["K"], evaluation_df["Inertia"], marker="o",
+                 linewidth=2, color="#63BFFF", label="WCSS")
+    ax_wcss.set_xlabel("Number of clusters")
+    ax_wcss.set_ylabel("WCSS", color=COLORS["text"])
+    ax_wcss.tick_params(axis="y", colors=COLORS["text"])
+    ax_wcss.set_xticks(evaluation_df["K"])
+    ax_wcss.set_title("Cluster-count evaluation")
+    ax_wcss.grid(axis="y", color=COLORS["grid"], alpha=0.55, linewidth=0.8)
+    ax_sil = ax_wcss.twinx()
+    ax_sil.plot(evaluation_df["K"], evaluation_df["Silhouette Score"], marker="o",
+                linewidth=2, color="#0878E8", label="Silhouette score")
+    ax_sil.set_ylabel("Silhouette score", color=COLORS["text"])
+    ax_sil.set_facecolor("none")
+    ax_sil.tick_params(axis="y", colors=COLORS["text"])
+    ax_sil.spines["right"].set_color(COLORS["grid"])
+    ax_wcss.spines["left"].set_color(COLORS["grid"])
+    lines = ax_wcss.get_lines() + ax_sil.get_lines()
+    legend = ax_wcss.legend(
+        lines,
+        [line.get_label() for line in lines],
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.2),
+        ncol=2,
+        frameon=True
+    )
+    legend.get_frame().set_facecolor(COLORS["surface"])
+    legend.get_frame().set_edgecolor(COLORS["grid"])
+    for label in legend.get_texts():
+        label.set_color(COLORS["text"])
+    fig_eval.subplots_adjust(bottom=0.3)
+    ax_wcss.title.set_color(COLORS["text"])
+    ax_wcss.xaxis.label.set_color(COLORS["text"])
+    ax_wcss.tick_params(axis="x", colors=COLORS["text"])
+    st.pyplot(fig_eval, use_container_width=False)
+    plt.close(fig_eval)
 
     best_col1, best_col2, best_col3 = st.columns(3)
     best_col1.metric("Best tested K", int(best_row["K"]))
@@ -597,7 +690,7 @@ cluster_counts = (
     .sort_index()
 )
 
-fig1, ax1 = plt.subplots(figsize=(8, 4))
+fig1, ax1 = plt.subplots(figsize=(6.5, 3.4))
 fig1.patch.set_facecolor(COLORS["surface"])
 bars = ax1.bar(
     cluster_counts.index.astype(str),
@@ -618,10 +711,11 @@ for bar in bars:
         bar.get_height(),
         f"{int(bar.get_height()):,}",
         ha="center",
-        va="bottom"
+        va="bottom",
+        color=COLORS["text"]
     )
 
-st.pyplot(fig1, use_container_width=True)
+st.pyplot(fig1, use_container_width=False)
 plt.close(fig1)
 
 
@@ -635,7 +729,7 @@ st.caption(
     "to two dimensions for visualization."
 )
 
-fig2, ax2 = plt.subplots(figsize=(9, 5))
+fig2, ax2 = plt.subplots(figsize=(7, 3.8))
 fig2.patch.set_facecolor(COLORS["surface"])
 
 for label in unique_labels:
@@ -656,9 +750,12 @@ ax2.set_title(f"{algorithm} - Customer Segments")
 ax2.set_xlabel("Principal Component 1")
 ax2.set_ylabel("Principal Component 2")
 style_axis(ax2)
-ax2.legend(frameon=True)
+legend = ax2.legend(frameon=True)
+legend.get_frame().set_facecolor(COLORS["surface"])
+legend.get_frame().set_edgecolor(COLORS["grid"])
+for label in legend.get_texts(): label.set_color(COLORS["text"])
 
-st.pyplot(fig2, use_container_width=True)
+st.pyplot(fig2, use_container_width=False)
 plt.close(fig2)
 
 
@@ -669,7 +766,7 @@ plt.close(fig2)
 st.subheader("Income vs Total Spending")
 st.caption("Compare customer income and spending behaviour across clusters.")
 
-fig3, ax3 = plt.subplots(figsize=(9, 5))
+fig3, ax3 = plt.subplots(figsize=(7, 3.8))
 fig3.patch.set_facecolor(COLORS["surface"])
 
 for label in unique_labels:
@@ -690,9 +787,12 @@ ax3.set_title("Customer Income vs Total Spending")
 ax3.set_xlabel("Income")
 ax3.set_ylabel("Total Spending")
 style_axis(ax3)
-ax3.legend(frameon=True)
+legend = ax3.legend(frameon=True)
+legend.get_frame().set_facecolor(COLORS["surface"])
+legend.get_frame().set_edgecolor(COLORS["grid"])
+for label in legend.get_texts(): label.set_color(COLORS["text"])
 
-st.pyplot(fig3, use_container_width=True)
+st.pyplot(fig3, use_container_width=False)
 plt.close(fig3)
 
 
@@ -712,7 +812,7 @@ spending_names = [
     for label in unique_labels
 ]
 
-fig4, ax4 = plt.subplots(figsize=(9, 5))
+fig4, ax4 = plt.subplots(figsize=(7, 3.8))
 fig4.patch.set_facecolor(COLORS["surface"])
 boxplot = ax4.boxplot(
     spending_groups,
@@ -723,12 +823,18 @@ boxplot = ax4.boxplot(
 for patch, label in zip(boxplot["boxes"], unique_labels):
     patch.set_facecolor(cluster_color_map[label])
     patch.set_alpha(0.8)
+    patch.set_edgecolor(COLORS["text"])
+    patch.set_linewidth(1.2)
+for line_group in (boxplot["whiskers"], boxplot["caps"], boxplot["medians"]):
+    for line in line_group:
+        line.set_color(COLORS["text"])
+        line.set_linewidth(1.2)
 ax4.set_title("Total Spending Across Clusters")
 ax4.set_xlabel("Cluster")
 ax4.set_ylabel("Total Spending")
 style_axis(ax4)
 
-st.pyplot(fig4, use_container_width=True)
+st.pyplot(fig4, use_container_width=False)
 plt.close(fig4)
 
 
@@ -738,7 +844,7 @@ plt.close(fig4)
 
 st.subheader("Customer Segment Share")
 
-fig5, ax5 = plt.subplots(figsize=(7, 5))
+fig5, ax5 = plt.subplots(figsize=(5.5, 3.8))
 fig5.patch.set_facecolor(COLORS["surface"])
 ax5.pie(
     cluster_counts.values,
@@ -753,9 +859,12 @@ ax5.pie(
     textprops={"color": COLORS["text"]}
 )
 ax5.set_title("Percentage of Customers in Each Cluster")
+ax5.title.set_color(COLORS["text"])
+for text_item in ax5.texts:
+    text_item.set_color(COLORS["text"])
 ax5.axis("equal")
 
-st.pyplot(fig5, use_container_width=True)
+st.pyplot(fig5, use_container_width=False)
 plt.close(fig5)
 
 
@@ -784,7 +893,7 @@ column_min = heatmap_data.min()
 column_range = (heatmap_data.max() - column_min).replace(0, 1)
 normalized_profile = (heatmap_data - column_min) / column_range
 
-fig6, ax6 = plt.subplots(figsize=(11, 5))
+fig6, ax6 = plt.subplots(figsize=(8, 3.8))
 fig6.patch.set_facecolor(COLORS["surface"])
 image = ax6.imshow(
     normalized_profile.values,
@@ -801,12 +910,15 @@ ax6.set_yticklabels([
 ])
 
 ax6.set_title("Normalized Cluster Profile Heatmap")
+ax6.title.set_color(COLORS["text"])
 ax6.tick_params(colors=COLORS["text"])
 for spine in ax6.spines.values():
     spine.set_color(COLORS["grid"])
 fig6.colorbar(image, ax=ax6, label="Relative value (0 to 1)")
+fig6.axes[-1].yaxis.label.set_color(COLORS["text"])
+fig6.axes[-1].tick_params(colors=COLORS["text"])
 
-st.pyplot(fig6, use_container_width=True)
+st.pyplot(fig6, use_container_width=False)
 plt.close(fig6)
 
 
@@ -1020,6 +1132,7 @@ if st.button("🎯 Predict Customer Cluster", use_container_width=True):
 
 st.divider()
 st.header("Customer Data")
+st.markdown('<div id="customer-data"></div>', unsafe_allow_html=True)
 
 csv_data = df_result.to_csv(index=False).encode("utf-8")
 
